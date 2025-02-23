@@ -130,6 +130,8 @@ kernel/configs/android-*.cfg
 #
 Android.bp
 
+*.orig
+
 # CosmicFresh cruft
 CosmicFresh/*.zip
 CosmicFresh/dtb*
