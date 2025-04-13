@@ -32,8 +32,8 @@ MAKE+=(
 
 # export environment variables
 export_env_vars() {
-    export KBUILD_BUILD_USER=Thiago
-    export KBUILD_BUILD_HOST=Debian
+    export KBUILD_BUILD_USER=thiago
+    export KBUILD_BUILD_HOST=archlinux
     export ARCH=arm64
 
     # CCACHE
