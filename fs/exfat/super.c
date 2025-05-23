@@ -720,7 +720,6 @@ static int exfat_fill_super(struct super_block *sb, void *data, int silent)
 	opts = &sbi->options;
 
 	sb->s_flags |= SB_NODIRATIME;
-	sb->s_magic = EXFAT_SUPER_MAGIC;
 	sb->s_op = &exfat_sops;
 	sb->s_xattr = exfat_xattr_handlers;
 
