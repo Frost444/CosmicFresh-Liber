@@ -32,8 +32,8 @@ MAKE+=(
 
 # export environment variables
 export_env_vars() {
-    export KBUILD_BUILD_USER=Thiago
-    export KBUILD_BUILD_HOST=Debian
+    export KBUILD_BUILD_USER=thiago
+    export KBUILD_BUILD_HOST=artix
     export ARCH=arm64
 
     # CCACHE
@@ -134,7 +134,7 @@ build_flashable_zip() {
     cp "$ORIGIN_DIR"/out/arch/arm64/boot/{Image.gz,dtbo.img} CosmicFresh/
     cp "$ORIGIN_DIR"/out/arch/arm64/boot/dts/qcom/sdmmagpie-odessa-base.dtb CosmicFresh/dtb
     cd "$ORIGIN_DIR"/CosmicFresh/ || exit
-    zip -r9 "CosmicFresh-R$KV-$FP_MODEL.zip" META-INF version anykernel.sh tools Image.gz dtb dtbo.img
+    zip -r9 "CosmicFresh-R$KV-$FP_MODEL.zip" META-INF f2fs-cold.list f2fs-hot.list version anykernel.sh tools Image.gz dtb dtbo.img
     rm -rf {Image.gz,dtb,dtbo.img}
     cd ../
 }
