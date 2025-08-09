@@ -15,10 +15,6 @@
 #include <linux/vmpressure.h>
 #include <uapi/linux/sched/types.h>
 
-/* Needed to prevent Android from thinking there's no LMK and thus rebooting */
-#undef MODULE_PARAM_PREFIX
-#define MODULE_PARAM_PREFIX "lowmemorykiller."
-
 /* The minimum number of pages to free per reclaim */
 static unsigned short slmk_minfree __read_mostly = CONFIG_ANDROID_SIMPLE_LMK_MINFREE;
 #define MIN_FREE_PAGES (slmk_minfree * SZ_1M / PAGE_SIZE)
@@ -44,11 +40,6 @@ static __cacheline_aligned_in_smp DEFINE_RWLOCK(mm_free_lock);
 static int nr_victims;
 static atomic_t needs_reclaim = ATOMIC_INIT(0);
 static atomic_t nr_killed = ATOMIC_INIT(0);
-
-#define ADJ_MAX 1000
-#define ADJ_DIVISOR 50
-static int lmk_count[(ADJ_MAX / ADJ_DIVISOR) + 1];
-module_param_array(lmk_count, int, NULL, S_IRUGO);
 
 static int victim_cmp(const void *lhs_ptr, const void *rhs_ptr)
 {
@@ -242,17 +233,10 @@ static void scan_and_kill(void)
 		};
 		struct victim_info *victim = &victims[i];
 		struct task_struct *t, *vtsk = victim->tsk;
-		int adj_index;
 
 		pr_info("Killing %s with adj %d to free %lu KiB\n", vtsk->comm,
 			vtsk->signal->oom_score_adj,
 			victim->size << (PAGE_SHIFT - 10));
-
-		/* Count kills */
-		adj_index = vtsk->signal->oom_score_adj / ADJ_DIVISOR;
-		if (adj_index > (ADJ_MAX / ADJ_DIVISOR))
-			adj_index = (ADJ_MAX / ADJ_DIVISOR);
-		lmk_count[adj_index]++;
 
 		/* Accelerate the victim's death by forcing the kill signal */
 		do_send_sig_info(SIGKILL, SEND_SIG_FORCED, vtsk, true);
@@ -308,7 +292,7 @@ static int simple_lmk_reclaim_thread(void *data)
 	while (1) {
 		wait_event_freezable(oom_waitq, atomic_read(&needs_reclaim));
 		scan_and_kill();
-		atomic_set_release(&needs_reclaim, 0);
+		atomic_set(&needs_reclaim, 0);
 	}
 
 	return 0;
@@ -336,8 +320,12 @@ void simple_lmk_mm_freed(struct mm_struct *mm)
 static int simple_lmk_vmpressure_cb(struct notifier_block *nb,
 				    unsigned long pressure, void *data)
 {
-	if (pressure == 100 && !atomic_cmpxchg_acquire(&needs_reclaim, 0, 1))
-		wake_up(&oom_waitq);
+	if (pressure == 100) {
+		atomic_set(&needs_reclaim, 1);
+		smp_mb__after_atomic();
+		if (waitqueue_active(&oom_waitq))
+			wake_up(&oom_waitq);
+	}
 
 	return NOTIFY_OK;
 }
@@ -363,14 +351,18 @@ static int simple_lmk_init_set(const char *val, const struct kernel_param *kp)
 	}
 
 	si_meminfo(&i);
-	if (i.totalram << (PAGE_SHIFT-10) > 4096ull * 1024) {
-	  // from - phone-xhdpi-6144-dalvik-heap.mk
-	  slmk_minfree = 168;
-	  slmk_timeout = 200;
-	} else {
-	  // from - phone-xhdpi-4096-dalvik-heap.mk
+	/* Convert totalram to KB */
+	i.totalram <<= (PAGE_SHIFT - 10);
+
+	if (i.totalram > 6144 * 1024) {
 	  slmk_minfree = 128;
 	  slmk_timeout = 200;
+	} else if (i.totalram > 4096 * 1024) {
+	  slmk_minfree = 192;
+	  slmk_timeout = 150;
+	} else {
+	  slmk_minfree = 224;
+	  slmk_timeout = 100;
 	}
 
 	return 0;
@@ -380,4 +372,9 @@ static const struct kernel_param_ops simple_lmk_init_ops = {
 	.set = simple_lmk_init_set
 };
 
+/* Needed to prevent Android from thinking there's no LMK and thus rebooting */
+#undef MODULE_PARAM_PREFIX
+#define MODULE_PARAM_PREFIX "lowmemorykiller."
 module_param_cb(minfree, &simple_lmk_init_ops, NULL, 0200);
+module_param(slmk_minfree, ushort, 0644);
+module_param(slmk_timeout, ushort, 0644);
