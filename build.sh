@@ -21,7 +21,7 @@ EGIS+=(
         -e CONFIG_FINGERPRINT_EGISTEC_FPS_MMI
 )
 MAKE+=(
-    -j6 \
+    -j30 \
         O=out \
         CROSS_COMPILE=aarch64-elf- \
         CROSS_COMPILE_ARM32=arm-eabi- \
@@ -32,8 +32,8 @@ MAKE+=(
 
 # export environment variables
 export_env_vars() {
-    export KBUILD_BUILD_USER=thiago
-    export KBUILD_BUILD_HOST=artix
+    export KBUILD_BUILD_USER=thiago81
+    export KBUILD_BUILD_HOST=amoloiras_and_morenas
     export ARCH=arm64
 
     # CCACHE
